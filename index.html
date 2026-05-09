@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6ナンバー計算ゲーム</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #e0f2fe, #eef2ff 50%, #f8fafc);
+      color: #334155;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 10px 14px;
+    }
+
+    .app { width: 100%; max-width: 720px; text-align: center; }
+    h1 { margin: 0 0 4px; font-size: 24px; color: #2563eb; }
+    .lead { margin: 0 0 10px; color: #64748b; font-size: 14px; }
+
+    .game-area { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+    .toy {
+      position: relative;
+      width: min(100vw, 520px);
+      height: min(100vw, 520px);
+      filter: drop-shadow(0 16px 22px rgba(59, 130, 246, 0.24));
+    }
+
+    .toy-body {
+      position: absolute;
+      inset: 15%;
+      border-radius: 44%;
+      background: linear-gradient(145deg, #93c5fd, #bfdbfe);
+      box-shadow: inset 0 10px 18px rgba(255,255,255,.5), inset 0 -12px 20px rgba(59,130,246,.22);
+    }
+
+    .pod-wrap {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 0;
+      height: 0;
+      transform: rotate(var(--angle));
+      transform-origin: center;
+    }
+
+    .pod {
+      position: absolute;
+      width: 104px;
+      height: 104px;
+      left: -52px;
+      top: -178px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #bfdbfe, #7dd3fc);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 8px 14px rgba(255,255,255,.56), inset 0 -10px 18px rgba(14,116,144,.18);
+    }
+
+    .tile {
+      width: 78px;
+      height: 78px;
+      border-radius: 18px;
+      background: #e6f0ff;
+      color: #1e3a8a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      font-weight: 950;
+      transform: rotate(calc(-1 * var(--angle) + var(--tilt))) perspective(520px) rotateX(10deg) rotateY(-10deg);
+      box-shadow: 6px 8px 0 #93c5fd, 12px 16px 16px rgba(37,99,235,.18);
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+      transition: transform .12s ease, filter .12s ease;
+    }
+
+    .tile:hover { filter: brightness(1.04); }
+    .tile.used { opacity: .45; filter: grayscale(.3); }
+
+    
+
+    
+
+    .center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #2563eb, #60a5fa);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      font-weight: 900;
+      box-shadow: inset 0 0 0 5px rgba(255,255,255,.35), 0 8px 18px rgba(37,99,235,.3);
+      z-index: 5;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 620px;
+      background: rgba(255,255,255,.86);
+      border: 1px solid rgba(191,219,254,.9);
+      border-radius: 20px;
+      padding: 14px;
+      box-shadow: 0 10px 24px rgba(59,130,246,.12);
+      backdrop-filter: blur(8px);
+    }
+
+    label { display: block; text-align: left; font-weight: 800; margin-bottom: 5px; color: #1e40af; }
+
+    input {
+      width: 100%;
+      height: 44px;
+      border: 2px solid #bfdbfe;
+      border-radius: 14px;
+      padding: 0 12px;
+      font-size: 16px;
+      outline: none;
+      background: #f8fafc;
+      color: #334155;
+    }
+
+    input:focus { border-color: #60a5fa; box-shadow: 0 0 0 4px rgba(96,165,250,.22); }
+
+    .keypad {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .keys { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .keys button { padding: 10px; border-radius: 10px; border: none; background: #bfdbfe; font-weight: 900; cursor: pointer; color: #1e3a8a; }
+
+    .hint { margin: 6px 0 10px; text-align: left; color: #64748b; font-size: 13px; }
+    .hint.warning { color: #0284c7; }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .12s ease, filter .12s ease;
+    }
+
+    button:hover { transform: translateY(-1px); filter: brightness(.98); }
+    .primary { background: #60a5fa; color: white; }
+    .secondary { background: #bae6fd; color: #075985; }
+    .outline { background: white; color: #2563eb; border: 2px solid #bfdbfe; }
+    .reset { background: #eef2ff; color: #4338ca; border: 2px solid #c7d2fe; }
+
+    .message {
+      margin-top: 10px;
+      border-radius: 16px;
+      padding: 10px 12px;
+      background: #eff6ff;
+      color: #2563eb;
+      text-align: left;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .message.correct { background: #dbeafe; color: #1d4ed8; }
+    .message.wrong { background: #e0f2fe; color: #0369a1; }
+    .message.giveup { background: #eef2ff; color: #4338ca; }
+    .solution { margin-top: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-weight: 800; }
+    .score { margin-top: 8px; color: #64748b; font-weight: 800; font-size: 14px; }
+    .timer { margin-top: 6px; color: #1d4ed8; font-weight: 900; font-size: 22px; letter-spacing: .02em; }
+
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15,23,42,.28);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      padding: 24px;
+    }
+
+    .dialog-overlay.show { display: flex; }
+
+    .result-dialog {
+      width: min(92vw, 430px);
+      border-radius: 32px;
+      padding: 34px 26px;
+      text-align: center;
+      background: white;
+      box-shadow: 0 28px 70px rgba(15,23,42,.28);
+      animation: popIn .38s cubic-bezier(.2,1.4,.4,1) forwards;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .result-dialog.correct {
+      background: linear-gradient(145deg, #dbeafe, #bfdbfe, #e0f2fe, #fef3c7);
+      color: #1d4ed8;
+      animation: popIn .38s cubic-bezier(.2,1.4,.4,1) forwards, glowPulse .9s ease-in-out infinite alternate;
+    }
+
+    .result-dialog.wrong { background: linear-gradient(145deg, #e0f2fe, #dbeafe, #eef2ff); color: #0369a1; }
+    .dialog-icon { font-size: 76px; line-height: 1; margin-bottom: 10px; animation: bounce .7s ease-in-out infinite alternate; }
+    .dialog-title { margin: 0; font-size: 42px; font-weight: 950; letter-spacing: .06em; }
+    .dialog-text { margin: 10px 0 22px; font-size: 18px; font-weight: 700; }
+    .dialog-button { background: #60a5fa; color: white; min-width: 140px; box-shadow: 0 8px 16px rgba(96,165,250,.28); }
+
+    .score-page {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15,23,42,.28);
+      backdrop-filter: blur(6px);
+      z-index: 90;
+      padding: 16px;
+    }
+
+    .score-page.show { display: flex; }
+    .score-card { width: min(94vw, 560px); max-height: 82vh; overflow: auto; background: rgba(255,255,255,.94); border: 1px solid #bfdbfe; border-radius: 24px; padding: 18px; box-shadow: 0 22px 58px rgba(37,99,235,.22); text-align: left; }
+    .score-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .score-card h2 { margin: 0; color: #2563eb; font-size: 22px; }
+    .score-list { display: flex; flex-direction: column; gap: 8px; }
+    .score-item { display: grid; grid-template-columns: 54px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: #eff6ff; color: #334155; font-weight: 700; }
+    .score-item.correct { background: #dbeafe; color: #1d4ed8; }
+    .score-item.wrong { background: #e0f2fe; color: #0369a1; }
+    .score-time { font-variant-numeric: tabular-nums; }
+    .score-empty { color: #64748b; padding: 12px; background: #f8fafc; border-radius: 14px; }
+
+    .confetti { position: fixed; width: 10px; height: 16px; border-radius: 3px; top: -20px; z-index: 120; animation: fall 1.15s linear forwards; }
+
+    @keyframes popIn { 0% { transform: scale(.72) rotate(-4deg); opacity: 0; } 70% { transform: scale(1.08) rotate(2deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+    @keyframes bounce { from { transform: translateY(0) scale(1); } to { transform: translateY(-8px) scale(1.08); } }
+    @keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+    @keyframes glowPulse { from { box-shadow: 0 28px 70px rgba(37,99,235,.28); } to { box-shadow: 0 30px 90px rgba(96,165,250,.5), 0 0 36px rgba(250,204,21,.45); } }
+
+    @media (max-width: 520px) {
+      body { padding: 6px; }
+      h1 { font-size: 18px; }
+      .toy {
+        width: 100vw;
+        height: 100vw;
+      }
+      .pod { width: 74px; height: 74px; left: -37px; top: -132px; }
+      .tile { width: 48px; height: 48px; font-size: 28px; border-radius: 13px; box-shadow: inset 4px 4px 7px rgba(255,255,255,.9), inset -5px -6px 9px rgba(37,99,235,.22), 4px 5px 0 #93c5fd, 8px 10px 12px rgba(37,99,235,.18); }
+      .center { width: 72px; height: 72px; font-size: 28px; }
+      .panel { padding: 12px; border-radius: 18px; }
+      input { height: 40px; font-size: 15px; }
+      button { flex: 1 1 calc(50% - 6px); padding: 9px 8px; font-size: 13px; }
+      .keys { grid-template-columns: repeat(7, 1fr); }
+      .message { font-size: 13px; }
+      .timer { font-size: 20px; }
+    }
+
+    @media (max-height: 720px) {
+      h1 { font-size: 20px; }
+      .lead { display: none; }
+      .game-area { gap: 6px; }
+      .toy { width: min(64vw, 285px); height: min(64vw, 285px); }
+      .pod { width: 74px; height: 74px; left: -37px; top: -132px; }
+      .tile { width: 48px; height: 48px; font-size: 28px; }
+      .center { width: 72px; height: 72px; font-size: 28px; }
+      .panel { padding: 10px; }
+      .message { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>6ナンバー計算ゲーム</h1>
+    
+
+    <div class="game-area">
+      <div class="toy">
+        <div class="toy-body"></div>
+        <div id="numberPods"></div>
+        <div id="target" class="center">0</div>
+      </div>
+
+      <section class="panel">
+        <label for="formula">計算式</label>
+        <input id="formula" type="text" placeholder="例: (1 + 2) * (3 + 4) - 5 + 6" autocomplete="off">
+
+        <div class="keypad">
+          <div class="keys">
+            <button data-key="+">+</button>
+            <button data-key="-">-</button>
+            <button data-key="*">×</button>
+            <button data-key="/">÷</button>
+            <button data-key="(">(</button>
+            <button data-key=")">)</button>
+            <button id="backspaceButton">⌫</button>
+          </div>
+        </div>
+
+        
+
+        <div class="buttons">
+          <button class="primary" id="checkButton">判定する</button>
+          <button class="secondary" id="giveUpButton">ギブアップ</button>
+          <button class="outline" id="nextButton">次の問題</button>
+          <button class="outline" id="detailButton">スコア詳細</button>
+          <button class="reset" id="resetScoreButton">スコアリセット</button>
+        </div>
+
+        <div id="message" class="message">次の問題ボタンで開始してください。</div>
+        <div id="score" class="score">スコア: 0 / 0</div>
+        <div id="streak" class="score">連勝: 0（最高: 0）</div>
+        <div id="timer" class="timer">経過時間: 0.0秒</div>
+      </section>
+    </div>
+  </main>
+
+  <div id="countdownOverlay" class="dialog-overlay">
+    <div class="result-dialog">
+      <div class="dialog-icon" id="countdownNumber">3</div>
+      <div class="dialog-text" id="countdownLabel"></div>
+    </div>
+  </div>
+
+  <div id="scorePage" class="score-page">
+    <div class="score-card">
+      <div class="score-card-header">
+        <h2>スコア詳細</h2>
+        <button id="closeScorePageButton" class="outline">閉じる</button>
+      </div>
+      <div id="scoreList" class="score-list"></div>
+    </div>
+  </div>
+
+  <div id="dialogOverlay" class="dialog-overlay">
+    <div id="resultDialog" class="result-dialog">
+      <div id="dialogIcon" class="dialog-icon">🎉</div>
+      <h2 id="dialogTitle" class="dialog-title">正解！</h2>
+      <p id="dialogText" class="dialog-text">次の問題へ進みます</p>
+      <button id="dialogButton" class="dialog-button">OK</button>
+    </div>
+  </div>
+
+  <script>
+    const operators = ["+", "-", "*", "/"];
+    const angles = [-25, 35, 95, 155, 215, 275];
+    const tilts = [-14, 10, -9, 13, -12, 11];
+
+    let problem = null;
+    let scoreHistory = JSON.parse(localStorage.getItem("sixNumbersHistory") || "[]");
+    let correctCount = 0;
+    let totalCount = 0;
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let alreadyCountedGiveUp = false;
+    let problemStartTime = 0;
+    let timerId = null;
+    let countdownId = null;
+    let isCountingDown = false;
+    let isPlaying = false;
+    let usedDiceIndexes = [];
+
+    const targetEl = document.getElementById("target");
+    const numberPodsEl = document.getElementById("numberPods");
+    const formulaEl = document.getElementById("formula");
+        const messageEl = document.getElementById("message");
+    const scoreEl = document.getElementById("score");
+    const streakEl = document.getElementById("streak");
+    const timerEl = document.getElementById("timer");
+    const countdownOverlayEl = document.getElementById("countdownOverlay");
+    const countdownNumberEl = document.getElementById("countdownNumber");
+    const dialogOverlayEl = document.getElementById("dialogOverlay");
+    const resultDialogEl = document.getElementById("resultDialog");
+    const dialogIconEl = document.getElementById("dialogIcon");
+    const dialogTitleEl = document.getElementById("dialogTitle");
+    const dialogTextEl = document.getElementById("dialogText");
+    const dialogButtonEl = document.getElementById("dialogButton");
+    const scorePageEl = document.getElementById("scorePage");
+    const scoreListEl = document.getElementById("scoreList");
+
+    document.getElementById("checkButton").addEventListener("click", checkAnswer);
+    document.getElementById("giveUpButton").addEventListener("click", giveUp);
+    document.getElementById("nextButton").addEventListener("click", nextProblem);
+    document.getElementById("detailButton").addEventListener("click", openScorePage);
+    document.getElementById("closeScorePageButton").addEventListener("click", closeScorePage);
+    document.getElementById("resetScoreButton").addEventListener("click", resetScore);
+    document.getElementById("backspaceButton").addEventListener("click", backspaceFormula);
+    dialogButtonEl.addEventListener("click", closeDialog);
+
+    document.querySelectorAll("[data-key]").forEach(function(button) {
+      button.addEventListener("click", function() {
+        insertToFormula(button.dataset.key);
+      });
+    });
+
+    formulaEl.addEventListener("keydown", function(event) {
+      if (event.key === "Enter") checkAnswer();
+    });
+    formulaEl.addEventListener("input", updateUsedNumbers);
+
+    updateScore();
+    nextProblem();
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function makeProblem() {
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const numbers = Array.from({ length: 6 }, function() { return randomInt(1, 6); });
+        const solution = makeRandomExpression(numbers);
+        if (Number.isInteger(solution.value) && solution.value >= -99 && solution.value <= 999) {
+          return { numbers: numbers, answer: solution.value, solution: solution.expression };
+        }
+      }
+      const numbers = Array.from({ length: 6 }, function() { return randomInt(1, 6); });
+      return { numbers: numbers, answer: numbers.reduce(function(a, b) { return a + b; }, 0), solution: numbers.join(" + ") };
+    }
+
+    function makeRandomExpression(numbers) {
+      const pool = numbers.map(function(n) { return { value: n, expression: String(n) }; });
+      while (pool.length > 1) {
+        const left = pool.splice(randomInt(0, pool.length - 1), 1)[0];
+        const right = pool.splice(randomInt(0, pool.length - 1), 1)[0];
+        let op = operators[randomInt(0, operators.length - 1)];
+        if (op === "/" && Math.abs(right.value) < 0.000000001) op = "+";
+        let value = left.value + right.value;
+        if (op === "-") value = left.value - right.value;
+        if (op === "*") value = left.value * right.value;
+        if (op === "/") value = left.value / right.value;
+        pool.push({ value: value, expression: "(" + left.expression + " " + op + " " + right.expression + ")" });
+      }
+      return pool[0];
+    }
+
+    function renderProblem() {
+      targetEl.textContent = problem.answer;
+      numberPodsEl.innerHTML = "";
+      for (let i = 0; i < problem.numbers.length; i++) {
+        const wrap = document.createElement("div");
+        wrap.className = "pod-wrap";
+        wrap.style.setProperty("--angle", angles[i] + "deg");
+        wrap.style.setProperty("--tilt", tilts[i] + "deg");
+
+        const pod = document.createElement("div");
+        pod.className = "pod";
+
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.textContent = problem.numbers[i];
+        tile.dataset.index = i;
+        tile.addEventListener("click", function() {
+          if (usedDiceIndexes.includes(i)) return;
+          usedDiceIndexes.push(i);
+          tile.classList.add("used");
+          insertToFormula(problem.numbers[i]);
+        });
+
+        pod.appendChild(tile);
+        wrap.appendChild(pod);
+        numberPodsEl.appendChild(wrap);
+      }
+      updateUsedNumbers();
+    }
+
+    function nextProblem() {
+      stopTimer();
+      clearCountdown();
+      problem = makeProblem();
+      usedDiceIndexes = [];
+      alreadyCountedGiveUp = false;
+      isPlaying = false;
+      formulaEl.value = "";
+      timerEl.textContent = "経過時間: 0.0秒";
+      setMessage("idle", "カウントダウン後に開始します。");
+      renderProblem();
+      formulaEl.focus();
+      startCountdown();
+    }
+
+    function startCountdown() {
+      clearCountdown();
+      isCountingDown = true;
+      let count = 3;
+      countdownNumberEl.textContent = count;
+      countdownOverlayEl.classList.add("show");
+
+      countdownId = setInterval(function() {
+        count--;
+        if (count > 0) {
+          countdownNumberEl.textContent = count;
+          return;
+        }
+        if (count === 0) {
+          countdownNumberEl.textContent = "START!";
+          return;
+        }
+        clearCountdown();
+        countdownOverlayEl.classList.remove("show");
+        isPlaying = true;
+        problemStartTime = Date.now();
+        startTimer();
+        setMessage("idle", "計算式を入力してください。");
+      }, 1000);
+    }
+
+    function clearCountdown() {
+      if (countdownId) clearInterval(countdownId);
+      countdownId = null;
+      isCountingDown = false;
+      countdownOverlayEl.classList.remove("show");
+    }
+
+    function startTimer() {
+      stopTimer();
+      updateTimer();
+      timerId = setInterval(updateTimer, 100);
+    }
+
+    function stopTimer() {
+      if (timerId) clearInterval(timerId);
+      timerId = null;
+    }
+
+    function getElapsedSeconds() {
+      if (!problemStartTime) return 0;
+      return Math.round(((Date.now() - problemStartTime) / 1000) * 10) / 10;
+    }
+
+    function updateTimer() {
+      timerEl.textContent = "経過時間: " + getElapsedSeconds().toFixed(1) + "秒";
+    }
+
+    function insertToFormula(value) {
+      formulaEl.value += value;
+      updateUsedNumbers();
+      formulaEl.focus();
+    }
+
+    function backspaceFormula() {
+      formulaEl.value = formulaEl.value.slice(0, -1);
+      syncUsedDiceFromFormula();
+      updateUsedNumbers();
+      formulaEl.focus();
+    }
+
+    function checkAnswer() {
+      const input = formulaEl.value.trim();
+      if (isCountingDown || !isPlaying) {
+        setMessage("wrong", "START! のあとに回答してください。");
+        return;
+      }
+      if (!input) {
+        setMessage("wrong", "計算式を入力してください。");
+        return;
+      }
+
+      const used = extractNumbers(input);
+      if (!sameNumbers(used, problem.numbers)) {
+        setMessage("wrong", "外側の6つの数字をすべて1回ずつ使ってください。");
+        return;
+      }
+
+      try {
+        const result = evaluateFormula(input);
+        if (Math.abs(result - problem.answer) < 0.000000001) {
+          stopTimer();
+          isPlaying = false;
+          const seconds = getElapsedSeconds();
+          addScoreHistory(true, seconds);
+          updateScore();
+          setMessage("correct", "正解！次の問題ボタンで進んでください。");
+          if (currentStreak > 0 && currentStreak % 5 === 0) {
+            showResultDialog("correct", "🏆", currentStreak + "連勝達成！", "すごい！タイム: " + seconds.toFixed(1) + "秒");
+            playStreakBonusSound();
+            launchConfetti(120);
+          } else {
+            showResultDialog("correct", "🔥", currentStreak + "連勝！", "正解！タイム: " + seconds.toFixed(1) + "秒");
+            playCorrectSound();
+            launchConfetti(55);
+          }
+        } else {
+          addScoreHistory(false, null);
+          updateScore();
+          setMessage("wrong", "不正解です。計算結果は " + roundNumber(result) + " でした。");
+          showResultDialog("wrong", "💧", "不正解", "計算結果は " + roundNumber(result) + " でした。もう一度チャレンジ！");
+          playWrongSound();
+        }
+      } catch (error) {
+        setMessage("wrong", error.message || "式を確認してください。");
+      }
+    }
+
+    function giveUp() {
+      if (!alreadyCountedGiveUp) {
+        addScoreHistory(false, null);
+        alreadyCountedGiveUp = true;
+      }
+      stopTimer();
+      isPlaying = false;
+      updateScore();
+      setMessage("giveup", "答えを表示しました。<div class='solution'>" + problem.solution + " = " + problem.answer + "</div>");
+    }
+
+    function evaluateFormula(formula) {
+      const normalized = formula.split("×").join("*").split("÷").join("/");
+      const allowed = "0123456789+-*/(). ";
+      for (let i = 0; i < normalized.length; i++) {
+        if (!allowed.includes(normalized[i])) throw new Error("式には数字、四則演算子、括弧だけを使ってください。");
+      }
+      const result = Function('"use strict"; return (' + normalized + ');')();
+      if (!Number.isFinite(result)) throw new Error("計算できない式です。");
+      return result;
+    }
+
+    function extractNumbers(formula) {
+      const numbers = [];
+      let current = "";
+      for (let i = 0; i < formula.length; i++) {
+        const ch = formula[i];
+        if (ch >= "0" && ch <= "9") current += ch;
+        else if (current) {
+          numbers.push(Number(current));
+          current = "";
+        }
+      }
+      if (current) numbers.push(Number(current));
+      return numbers;
+    }
+
+    function sameNumbers(a, b) {
+      return a.slice().sort(function(x, y) { return x - y; }).join(",") === b.slice().sort(function(x, y) { return x - y; }).join(",");
+    }
+
+    function updateUsedNumbers() {
+      document.querySelectorAll(".tile").forEach(function(tile) {
+        const index = Number(tile.dataset.index);
+        tile.classList.toggle("used", usedDiceIndexes.includes(index));
+      });
+    }
+
+    function syncUsedDiceFromFormula() {
+      usedDiceIndexes = [];
+
+      if (!problem) return;
+
+      const usedNumbers = extractNumbers(formulaEl.value);
+      const available = problem.numbers.map(function(value, index) {
+        return { value: value, index: index, used: false };
+      });
+
+      usedNumbers.forEach(function(number) {
+        const found = available.find(function(item) {
+          return !item.used && item.value === number;
+        });
+
+        if (found) {
+          found.used = true;
+          usedDiceIndexes.push(found.index);
+        }
+      });
+    }
+
+    function addScoreHistory(isCorrect, seconds) {
+      scoreHistory.push({ correct: isCorrect, seconds: seconds, date: new Date().toLocaleString("ja-JP") });
+      saveHistory();
+      recalculateStatsFromHistory();
+    }
+
+    function recalculateStatsFromHistory() {
+      correctCount = 0;
+      totalCount = scoreHistory.length;
+      currentStreak = 0;
+      bestStreak = 0;
+      let runningStreak = 0;
+
+      scoreHistory.forEach(function(item) {
+        if (item.correct) {
+          correctCount++;
+          runningStreak++;
+          if (runningStreak > bestStreak) bestStreak = runningStreak;
+        } else {
+          runningStreak = 0;
+        }
+      });
+      currentStreak = runningStreak;
+    }
+
+    function updateScore() {
+      recalculateStatsFromHistory();
+      scoreEl.textContent = "スコア: " + correctCount + " / " + totalCount;
+      streakEl.textContent = "連勝: " + currentStreak + "（最高: " + bestStreak + "）";
+      saveHistory();
+    }
+
+    function saveHistory() {
+      localStorage.setItem("sixNumbersHistory", JSON.stringify(scoreHistory));
+    }
+
+    function resetScore() {
+      scoreHistory = [];
+      localStorage.removeItem("sixNumbersHistory");
+      localStorage.removeItem("sixNumbersCorrect");
+      localStorage.removeItem("sixNumbersTotal");
+      updateScore();
+      setMessage("idle", "スコアをリセットしました。");
+    }
+
+    function openScorePage() {
+      renderScoreHistory();
+      scorePageEl.classList.add("show");
+    }
+
+    function closeScorePage() {
+      scorePageEl.classList.remove("show");
+    }
+
+    function renderScoreHistory() {
+      scoreListEl.innerHTML = "";
+      if (scoreHistory.length === 0) {
+        scoreListEl.innerHTML = "<div class='score-empty'>まだ記録がありません。</div>";
+        return;
+      }
+      scoreHistory.slice().reverse().forEach(function(item, index) {
+        const originalNumber = scoreHistory.length - index;
+        const row = document.createElement("div");
+        row.className = "score-item " + (item.correct ? "correct" : "wrong");
+        row.innerHTML = "<div>#" + originalNumber + "</div><div>" + (item.correct ? "正解" : "不正解") + "</div><div class='score-time'>" + (item.correct ? Number(item.seconds).toFixed(1) + "秒" : "-") + "</div>";
+        scoreListEl.appendChild(row);
+      });
+    }
+
+    function setMessage(type, html) {
+      messageEl.className = "message";
+      if (type !== "idle") messageEl.classList.add(type);
+      messageEl.innerHTML = html;
+    }
+
+    function showResultDialog(type, icon, title, text) {
+      resultDialogEl.className = "result-dialog " + type;
+      dialogIconEl.textContent = icon;
+      dialogTitleEl.textContent = title;
+      dialogTextEl.textContent = text;
+      dialogOverlayEl.classList.add("show");
+    }
+
+    function closeDialog() {
+      dialogOverlayEl.classList.remove("show");
+    }
+
+    function playTone(frequency, duration, startTime, type, volume) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      const audioContext = new AudioContextClass();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime + startTime);
+      gain.gain.setValueAtTime(volume, audioContext.currentTime + startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + startTime + duration);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(audioContext.currentTime + startTime);
+      oscillator.stop(audioContext.currentTime + startTime + duration);
+    }
+
+    function playCorrectSound() {
+      playTone(523.25, .1, 0, "sine", .16);
+      playTone(659.25, .1, .09, "sine", .16);
+      playTone(783.99, .12, .18, "sine", .18);
+      playTone(1046.5, .22, .3, "triangle", .2);
+      playTone(1318.51, .24, .44, "triangle", .16);
+    }
+
+    function playStreakBonusSound() {
+      playTone(392, .1, 0, "sine", .18);
+      playTone(523.25, .1, .1, "sine", .18);
+      playTone(659.25, .12, .2, "sine", .2);
+      playTone(783.99, .14, .32, "triangle", .2);
+      playTone(1046.5, .2, .48, "triangle", .22);
+      playTone(1567.98, .34, .66, "sine", .18);
+    }
+
+    function playWrongSound() {
+      playTone(220, .16, 0, "triangle", .12);
+      playTone(164.81, .22, .14, "triangle", .12);
+    }
+
+    function launchConfetti(amount) {
+      const colors = ["#bfdbfe", "#93c5fd", "#7dd3fc", "#c4b5fd", "#dbeafe", "#fef3c7", "#fbcfe8"];
+      const count = amount || 42;
+      for (let i = 0; i < count; i++) {
+        const piece = document.createElement("div");
+        piece.className = "confetti";
+        piece.style.left = Math.random() * 100 + "vw";
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDelay = Math.random() * .45 + "s";
+        piece.style.animationDuration = (.9 + Math.random() * .9) + "s";
+        document.body.appendChild(piece);
+        setTimeout(function() { piece.remove(); }, 2200);
+      }
+    }
+
+    function roundNumber(value) {
+      return Number(value.toFixed(6));
+    }
+  </script>
+</body>
+</html>
